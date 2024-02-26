@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_firebase/screens/admin/category.dart';
-import 'package:flutter_firebase/screens/admin/subcategory.dart';
+import 'package:flutter_firebase/screens/admin/district.dart';
+import 'package:flutter_firebase/screens/admin/place.dart';
 import 'package:flutter_firebase/widgets/custom_scaffold.dart';
 
 class AdminDashboard extends StatelessWidget {
@@ -32,7 +32,7 @@ class AdminDashboard extends StatelessWidget {
                         Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const Category(),
+                              builder: (context) => const District(),
                             ));
                       },
                       child: const Box(text: 'Category')),
@@ -44,7 +44,7 @@ class AdminDashboard extends StatelessWidget {
                         Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const SubCategory(),
+                              builder: (context) => const Place(),
                             ));
                       },
                       child: const Box(text: 'Sub Category'))

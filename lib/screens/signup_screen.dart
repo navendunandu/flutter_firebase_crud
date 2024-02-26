@@ -6,6 +6,7 @@ import 'package:flutter_firebase/screens/signin_screen.dart';
 import 'package:flutter_firebase/theme/theme.dart';
 import 'package:flutter_firebase/widgets/custom_scaffold.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -19,11 +20,30 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool agreePersonalData = true;
   XFile? _selectedImage;
   String? _imageUrl;
+  String? filePath;
   TextEditingController _nameController = TextEditingController();
   TextEditingController _emailController = TextEditingController();
   TextEditingController _dobController = TextEditingController();
   TextEditingController _addressController = TextEditingController();
   TextEditingController _passController = TextEditingController();
+
+  Future<void> _pickFile() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles();
+
+      if (result != null) {
+        setState(() {
+          filePath = result.files.single.path;
+        });
+      } else {
+        // User canceled file picking
+        print('File picking canceled.');
+      }
+    } catch (e) {
+      // Handle exceptions
+      print('Error picking file: $e');
+    }
+  }
 
   Future<void> _pickImage() async {
     final pickedFile =
@@ -409,6 +429,29 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       ),
                       const SizedBox(
                         height: 25.0,
+                      ),
+                      Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: _pickFile,
+                                  child: Text('Upload File'),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 16),
+                          if (filePath != null)
+                            Text(
+                              'Selected File: $filePath',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                        ],
+                      ),
+                      SizedBox(
+                        height: 25,
                       ),
                       // password
                       TextFormField(

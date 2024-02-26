@@ -16,6 +16,13 @@ dependencies:
   cupertino_icons: ^1.0.2
   icons_plus: ^4.0.0
   image_picker: ^1.0.7
+  cloud_firestore: ^4.15.5
+  firebase_core: ^2.25.4
+  firebase_auth: ^4.17.4
+  firebase_storage: ^11.6.6
+  fluttertoast: ^8.2.4
+  progress_dialog_null_safe: ^2.0.0
+  file_picker: ^6.1.1
 
 dev_dependencies:
   flutter_test:
