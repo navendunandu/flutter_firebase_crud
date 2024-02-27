@@ -14,6 +14,7 @@ class _PlaceState extends State<Place> {
   TextEditingController _catController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   String? _selectedCat;
+  String editId = '';
 
   List<Map<String, dynamic>> distList = [];
   List<Map<String, dynamic>> placeData = [];
@@ -70,19 +71,22 @@ class _PlaceState extends State<Place> {
   Future<void> fetchData() async {
     try {
       QuerySnapshot<Map<String, dynamic>> querySnapshot =
-          await db.collection('place').get();
+          await FirebaseFirestore.instance.collection('place').get();
 
       List<Map<String, dynamic>> place = [];
 
       for (var doc in querySnapshot.docs) {
         try {
-          String? district = await getDistrict(doc['district']); // Await here
-          // print(district);
-          place.add({
-            'id': doc.id,
-            'place': doc['place'].toString(),
-            'district': district,
-          });
+          Map<String, dynamic>? districtData =
+              await getDistrict(doc['district']);
+          if (districtData != null) {
+            place.add({
+              'id': doc.id,
+              'place': doc['place'].toString(),
+              'district': districtData['districtName'],
+              'districtId': districtData['collectionName'],
+            });
+          }
         } catch (e) {
           print('Error fetching district for place ${doc.id}: $e');
           // Handle the error gracefully, e.g., add a default value or log the error.
@@ -96,18 +100,24 @@ class _PlaceState extends State<Place> {
     }
   }
 
-  Future<String?> getDistrict(String collectionId) async {
+  Future<Map<String, dynamic>?> getDistrict(String collectionId) async {
     try {
       // Get the district document using the collection ID
-      final docSnapshot =
-          await db.collection('district').doc(collectionId).get();
+      final docSnapshot = await FirebaseFirestore.instance
+          .collection('district')
+          .doc(collectionId)
+          .get();
 
       // Check if the document exists
       if (docSnapshot.exists) {
-        // Extract the district value
-        final districtValue = docSnapshot.data()!['district'];
-        // print(districtValue);
-        return districtValue;
+        // Extract the district value and collection name
+        final districtValue = docSnapshot.data()?['district'];
+        final collectionName = docSnapshot.id;
+
+        return {
+          'districtName': districtValue,
+          'collectionName': collectionName,
+        };
       } else {
         return null; // Return null if the document doesn't exist
       }
@@ -116,6 +126,80 @@ class _PlaceState extends State<Place> {
       print("Error fetching district value: $error");
       return null;
     }
+  }
+
+  void editItem(String documentId, String item, String dropId) {
+    setState(() {
+      _catController.text = item;
+      editId = documentId;
+      _selectedCat = dropId;
+    });
+  }
+
+  void updateItem() {
+    Map<String, dynamic> newData = {
+      'place': _catController.text,
+      'district': _selectedCat
+    };
+    print(newData);
+    try {
+      db.collection('place').doc(editId).update(newData).then((_) {
+        Fluttertoast.showToast(
+          msg: 'Updated',
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.green,
+          textColor: Colors.white,
+        );
+        print("Document successfully updated!");
+      });
+      setState(() {
+        editId = '';
+        _catController.clear();
+        _selectedCat = null;
+      });
+
+      fetchData();
+    } catch (e) {
+      Fluttertoast.showToast(
+        msg: 'Failed',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
+      editId = '';
+      _catController.clear();
+      print(e);
+    }
+  }
+
+  void deleteItem(String documentId) {
+    db
+        .collection(
+            'place') // Replace 'your_collection' with your actual collection name
+        .doc(documentId)
+        .delete()
+        .then((_) {
+      Fluttertoast.showToast(
+        msg: 'Deleted',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.green,
+        textColor: Colors.white,
+      );
+      print("Document successfully deleted!");
+      fetchData();
+    }).catchError((error) {
+      Fluttertoast.showToast(
+        msg: 'Failed',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
+      print("Error deleting document: $error");
+    });
   }
 
   @override
@@ -233,7 +317,11 @@ class _PlaceState extends State<Place> {
                   ),
                   ElevatedButton(
                       onPressed: () {
-                        insertData();
+                        if (editId == '') {
+                          insertData();
+                        } else {
+                          updateItem();
+                        }
                       },
                       child: const Text('Submit')),
                   ListView.builder(
@@ -252,13 +340,13 @@ class _PlaceState extends State<Place> {
                             children: [
                               IconButton(
                                   onPressed: () {
-                                    // editItem(
-                                    //     documentId, data['district']);
+                                    editItem(data['id'], data['place'],
+                                        data['districtId']);
                                   },
                                   icon: Icon(Icons.edit)),
                               IconButton(
                                   onPressed: () {
-                                    // deleteItem(documentId);
+                                    deleteItem(data['id']);
                                   },
                                   icon: Icon(Icons.delete)),
                             ],
