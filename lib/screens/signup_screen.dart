@@ -1,12 +1,17 @@
-import 'dart:io';
+// ignore_for_file: avoid_print
 
+import 'dart:io';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
-// import 'package:icons_plus/icons_plus.dart';
 import 'package:flutter_firebase/screens/signin_screen.dart';
 import 'package:flutter_firebase/theme/theme.dart';
 import 'package:flutter_firebase/widgets/custom_scaffold.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:progress_dialog_null_safe/progress_dialog_null_safe.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -21,11 +26,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
   XFile? _selectedImage;
   String? _imageUrl;
   String? filePath;
-  TextEditingController _nameController = TextEditingController();
-  TextEditingController _emailController = TextEditingController();
-  TextEditingController _dobController = TextEditingController();
-  TextEditingController _addressController = TextEditingController();
-  TextEditingController _passController = TextEditingController();
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _dobController = TextEditingController();
+  final TextEditingController _addressController = TextEditingController();
+  final TextEditingController _passController = TextEditingController();
+  List<Map<String, dynamic>> district = [];
+  List<Map<String, dynamic>> place = [];
+  FirebaseFirestore db = FirebaseFirestore.instance;
+
+  late ProgressDialog _progressDialog;
 
   Future<void> _pickFile() async {
     try {
@@ -56,23 +66,150 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
   }
 
-  List<Map<String, dynamic>> district = [
-    {'id': 'ernakulam', 'name': 'Ernakulam'},
-    {'id': 'idukki', 'name': 'Idukki'},
-    {'id': 'kottayam', 'name': 'Kottayam'},
-  ];
+  Future<void> fetchDistrict() async {
+    try {
+      QuerySnapshot<Map<String, dynamic>> querySnapshot =
+          await db.collection('district').get();
+
+      List<Map<String, dynamic>> dist = querySnapshot.docs
+          .map((doc) => {
+                'id': doc.id,
+                'district': doc['district'].toString(),
+              })
+          .toList();
+      setState(() {
+        district = dist;
+      });
+    } catch (e) {
+      print('Error fetching department data: $e');
+    }
+  }
+
+  Future<void> fetchPlace(String id) async {
+    try {
+      selectplace = null;
+      QuerySnapshot<Map<String, dynamic>> querySnapshot =
+          await db.collection('place').where('district', isEqualTo: id).get();
+      List<Map<String, dynamic>> plc = querySnapshot.docs
+          .map((doc) => {
+                'id': doc.id,
+                'place': doc['place'].toString(),
+              })
+          .toList();
+      setState(() {
+        place = plc;
+      });
+    } catch (e) {
+      print(e);
+    }
+  }
+
+  Future<void> _registerUser() async {
+    try {
+      _progressDialog.show();
+
+      UserCredential userCredential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _emailController.text,
+        password: _passController.text,
+      );
+
+      if (userCredential != null) {
+        await _storeUserData(userCredential.user!.uid);
+        Fluttertoast.showToast(
+          msg: "Registration Successful",
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.green,
+          textColor: Colors.white,
+        );
+        _progressDialog.hide();
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      _progressDialog.hide();
+      Fluttertoast.showToast(
+        msg: "Registration Failed",
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
+      print("Error registering user: $e");
+      // Handle error, show message, or take appropriate action
+    }
+  }
+
+  Future<void> _storeUserData(String userId) async {
+    try {
+      await db.collection('users').add({
+        'uid': userId,
+        'name': _nameController.text,
+        'email': _emailController.text,
+        'password': _passController.text,
+        'dob': _dobController.text,
+        'address': _addressController.text,
+        'place': selectplace,
+        'gender': selectedGender,
+        // Add more fields as needed
+      });
+
+      await _uploadImage(userId);
+    } catch (e) {
+      print("Error storing user data: $e");
+      // Handle error, show message or take appropriate action
+    }
+  }
+
+  Future<void> _uploadImage(String userId) async {
+    try {
+      if (_selectedImage != null) {
+        Reference ref =
+            FirebaseStorage.instance.ref().child('User/Photo/$userId.jpg');
+        UploadTask uploadTask = ref.putFile(File(_selectedImage!.path));
+        TaskSnapshot taskSnapshot = await uploadTask.whenComplete(() => null);
+
+        String imageUrl = await taskSnapshot.ref.getDownloadURL();
+
+        await db.collection('users').doc(userId).update({
+          'imageUrl': imageUrl,
+        });
+      }
+
+      if (filePath != null) {
+        // Step 2: Upload file to Firebase Storage with the original file name
+        Reference fileRef =
+            FirebaseStorage.instance.ref().child('User Proof/$userId');
+        UploadTask fileUploadTask = fileRef.putFile(File(filePath!));
+        TaskSnapshot fileTaskSnapshot =
+            await fileUploadTask.whenComplete(() => null);
+
+        // Step 3: Get download URL of the uploaded file
+        String fileUrl = await fileTaskSnapshot.ref.getDownloadURL();
+
+        // Step 4: Update user's collection in Firestore with the file URL
+        await db.collection('users').doc(userId).update({
+          'proofUrl': fileUrl,
+        });
+      }
+    } catch (e) {
+      print("Error uploading image: $e");
+      // Handle error, show message or take appropriate action
+    }
+  }
 
   String? selectdistrict;
-
-  List<Map<String, dynamic>> place = [
-    {'id': 'muvattupuzha', 'name': 'Muvattupuzha'},
-    {'id': 'aluva', 'name': 'Aluva'},
-    {'id': 'guruvayoor', 'name': 'Guruvayoor'},
-  ];
 
   String? selectplace;
 
   String? selectedGender;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchDistrict();
+    _progressDialog = ProgressDialog(context);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -344,6 +481,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         onChanged: (String? newValue) {
                           setState(() {
                             selectdistrict = newValue;
+                            fetchPlace(newValue!);
                           });
                         },
                         isExpanded: true,
@@ -351,7 +489,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           (Map<String, dynamic> dist) {
                             return DropdownMenuItem<String>(
                               value: dist['id'],
-                              child: Text(dist['name']),
+                              child: Text(dist['district']),
                             );
                           },
                         ).toList(),
@@ -390,7 +528,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           (Map<String, dynamic> place) {
                             return DropdownMenuItem<String>(
                               value: place['id'],
-                              child: Text(place['name']),
+                              child: Text(place['place']),
                             );
                           },
                         ).toList(),
@@ -437,20 +575,20 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               Expanded(
                                 child: ElevatedButton(
                                   onPressed: _pickFile,
-                                  child: Text('Upload File'),
+                                  child: const Text('Upload File'),
                                 ),
                               ),
                             ],
                           ),
-                          SizedBox(height: 16),
+                          const SizedBox(height: 16),
                           if (filePath != null)
                             Text(
                               'Selected File: $filePath',
-                              style: TextStyle(fontSize: 16),
+                              style: const TextStyle(fontSize: 16),
                             ),
                         ],
                       ),
-                      SizedBox(
+                      const SizedBox(
                         height: 25,
                       ),
                       // password
@@ -494,11 +632,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           onPressed: () {
                             if (_formSignupKey.currentState!.validate() &&
                                 agreePersonalData) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Processing Data'),
-                                ),
-                              );
+                              _registerUser();
                             } else if (!agreePersonalData) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(

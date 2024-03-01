@@ -12,7 +12,7 @@ class Place extends StatefulWidget {
 
 class _PlaceState extends State<Place> {
   TextEditingController _catController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
+  // final _formKey = GlobalKey<FormState>();
   String? _selectedCat;
   String editId = '';
 

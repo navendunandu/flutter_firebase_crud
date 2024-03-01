@@ -1,8 +1,12 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_firebase/screens/u_dashboard.dart';
 import 'package:icons_plus/icons_plus.dart';
 import 'package:flutter_firebase/screens/admin/dashboard.dart';
 import 'package:flutter_firebase/screens/signup_screen.dart';
 import 'package:flutter_firebase/widgets/custom_scaffold.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:progress_dialog_null_safe/progress_dialog_null_safe.dart';
 
 import '../theme/theme.dart';
 
@@ -18,8 +22,15 @@ class _SignInScreenState extends State<SignInScreen> {
   bool rememberPassword = true;
   TextEditingController _emailController = TextEditingController();
   TextEditingController _passController = TextEditingController();
+  late ProgressDialog _progressDialog;
 
-  void _login() {
+  @override
+  void initState() {
+    super.initState();
+    _progressDialog = ProgressDialog(context);
+  }
+
+  Future<void> _login() async {
     if (_emailController.text == 'admin@gmail.com' &&
         _passController.text == 'admin1234') {
       Navigator.push(
@@ -27,6 +38,49 @@ class _SignInScreenState extends State<SignInScreen> {
           MaterialPageRoute(
             builder: (context) => AdminDashboard(),
           ));
+    } else {
+      try {
+        _progressDialog.show();
+
+        final FirebaseAuth auth = FirebaseAuth.instance;
+        final UserCredential userCredential =
+            await auth.signInWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passController.text.trim(),
+        );
+
+        print(userCredential.user?.uid);
+
+        String? userId = userCredential.user?.uid;
+        if (userId != null) {
+          Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const UserDash(),
+              ));
+        } else {
+          _progressDialog.hide();
+
+          print('Failed to fetch student status.');
+        }
+      } catch (e) {
+        _progressDialog.hide();
+
+        // Handle login failure and show an error toast.
+        String errorMessage = 'Login failed';
+
+        if (e is FirebaseAuthException) {
+          errorMessage = e.code;
+        }
+
+        Fluttertoast.showToast(
+          msg: errorMessage,
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.red,
+          textColor: Colors.white,
+        );
+      }
     }
   }
 
