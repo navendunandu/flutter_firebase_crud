@@ -87,7 +87,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   Future<void> fetchPlace(String id) async {
     try {
-      selectplace = null;
+      selectplace = '';
       QuerySnapshot<Map<String, dynamic>> querySnapshot =
           await db.collection('place').where('district', isEqualTo: id).get();
       List<Map<String, dynamic>> plc = querySnapshot.docs
@@ -170,9 +170,20 @@ class _SignUpScreenState extends State<SignUpScreen> {
         TaskSnapshot taskSnapshot = await uploadTask.whenComplete(() => null);
 
         String imageUrl = await taskSnapshot.ref.getDownloadURL();
-
-        await db.collection('users').doc(userId).update({
+        Map<String, dynamic> newData = {
           'imageUrl': imageUrl,
+        };
+        await db
+            .collection('users')
+            .where('user_id', isEqualTo: userId) // Filtering by user_id
+            .get()
+            .then((QuerySnapshot querySnapshot) {
+          querySnapshot.docs.forEach((doc) {
+            // For each document matching the query, update the data
+            doc.reference.update(newData);
+          });
+        }).catchError((error) {
+          print("Error updating user: $error");
         });
       }
 
@@ -186,10 +197,21 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
         // Step 3: Get download URL of the uploaded file
         String fileUrl = await fileTaskSnapshot.ref.getDownloadURL();
-
-        // Step 4: Update user's collection in Firestore with the file URL
-        await db.collection('users').doc(userId).update({
+        Map<String, dynamic> newData = {
           'proofUrl': fileUrl,
+        };
+        // Step 4: Update user's collection in Firestore with the file URL
+        await db
+            .collection('users')
+            .where('user_id', isEqualTo: userId) // Filtering by user_id
+            .get()
+            .then((QuerySnapshot querySnapshot) {
+          querySnapshot.docs.forEach((doc) {
+            // For each document matching the query, update the data
+            doc.reference.update(newData);
+          });
+        }).catchError((error) {
+          print("Error updating user: $error");
         });
       }
     } catch (e) {
@@ -198,9 +220,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
   }
 
-  String? selectdistrict;
+  String selectdistrict = '';
 
-  String? selectplace;
+  String selectplace = '';
 
   String? selectedGender;
 
@@ -458,7 +480,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         height: 15.0,
                       ),
                       DropdownButtonFormField<String>(
-                        value: selectdistrict,
+                        value:
+                            selectdistrict.isNotEmpty ? selectdistrict : null,
                         decoration: InputDecoration(
                           label: const Text('District'),
                           hintText: 'Select District',
@@ -480,8 +503,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         ),
                         onChanged: (String? newValue) {
                           setState(() {
-                            selectdistrict = newValue;
-                            fetchPlace(newValue!);
+                            selectdistrict = newValue!;
+                            fetchPlace(newValue);
                           });
                         },
                         isExpanded: true,
@@ -498,7 +521,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         height: 20,
                       ),
                       DropdownButtonFormField<String>(
-                        value: selectplace,
+                        value: selectplace.isNotEmpty ? selectplace : null,
                         decoration: InputDecoration(
                           label: const Text('Place'),
                           hintText: 'Select Place',
@@ -520,7 +543,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         ),
                         onChanged: (String? newValue) {
                           setState(() {
-                            selectplace = newValue;
+                            selectplace = newValue!;
                           });
                         },
                         isExpanded: true,
